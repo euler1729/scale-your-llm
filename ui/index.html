@@ -100,13 +100,8 @@ const inputEl = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const modelNameEl = document.getElementById("model-name");
 
-let history = [];   // {role, content} — kept in memory only
+let history = [];
 let streaming = false;
-
-// fetch model name
-fetch("/api/model").then(r => r.json()).then(d => {
-  modelNameEl.textContent = d.model || "model";
-}).catch(() => { modelNameEl.textContent = "offline"; });
 
 function autosize() {
   inputEl.style.height = "auto";
@@ -126,7 +121,6 @@ function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// minimal markdown: code fences + inline code
 function render(text) {
   let html = escapeHtml(text);
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code}</code></pre>`);
@@ -170,11 +164,15 @@ async function send() {
   let acc = "";
 
   try {
-    const resp = await fetch("/api/chat", {
+    const resp = await fetch("https://chat-api.cognistorm.ai/api/v1/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({ 
+        messages: history,
+        stream: true
+      }),
     });
+    
     if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
 
     const reader = resp.body.getReader();

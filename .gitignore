@@ -3,3 +3,10 @@ llama.cpp
 models
 wikitext-2-raw
 wikitext-2-raw-v1.zip
+
+# environment files
+.env
+
+# compiled python files
+*.pyc
+*.pyd

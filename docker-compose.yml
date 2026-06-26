@@ -3,17 +3,14 @@ services:
     image: vllm/vllm-openai:latest
     container_name: vllm-gguf-server
     runtime: nvidia
-    ports:
-      - "8000:8000"
     volumes:
       - ./models:/models
       - ~/.cache/huggingface:/root/.cache/huggingface
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
     command: >
-      --model ./models/qwen-f16.gguf
+      --model Qwen/Qwen3.5-0.8B
       --tokenizer-mode auto
-      
     deploy:
       resources:
         reservations:
@@ -22,3 +19,25 @@ services:
               count: all
               capabilities: [gpu]
     ipc: host
+    restart: unless-stopped
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    restart: unless-stopped
