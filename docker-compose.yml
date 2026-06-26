@@ -1,0 +1,24 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-gguf-server
+    runtime: nvidia
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command: >
+      --model ./models/qwen-f16.gguf
+      --tokenizer-mode auto
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host

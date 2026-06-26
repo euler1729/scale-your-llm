@@ -30,7 +30,7 @@ git --version
 
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose
+sudo apt install -y docker.io docker-compose python3-setuptools
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 ```
