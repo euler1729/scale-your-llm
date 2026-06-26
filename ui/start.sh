@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch the llama.cpp backend (port 8080) + the chat UI (port 8000).
+# Launch the llama.cpp backend (port 8000) + the chat UI (port 3000).
 # Usage: ./ui/start.sh   (run from repo root or anywhere)
 set -euo pipefail
 
