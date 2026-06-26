@@ -12,9 +12,57 @@
 
 EXP 0–5 run fine on **CPU only**. A GPU is needed for EXP 6 and LAB 04.
 
+## Initial Setup
+
+### Git Installation
+
 ```bash
-# Work from the repo root
-cd ~/workshop/day2/scale-your-llm
+sudo apt update
+sudo apt install -y git
+```
+Check (prints a version number):
+
+```bash
+git --version
+```
+
+### Docker Installation
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
+Check (prints a version number — log out and back in to apply the group change):
+
+```bash
+docker --version
+```
+
+### Clone the repository
+```bash
+git clone https://github.com/euler1729/scale-your-llm.git 
+```
+
+### Work from the repo root
+
+```bash
+cd scale-your-llm/
+```
+### Create a Python virtual environment
+
+```bash
+sudo apt install python3.12-venv
+```
+```bash
+python3 -m venv .venv
+```
+```bash
+source .venv/bin/activate
+```
+```bash
+pip install -U pip
 ```
 
 ---
@@ -26,14 +74,10 @@ cd ~/workshop/day2/scale-your-llm
 **Goal:** create a clean Python env and build the llama.cpp toolchain.
 
 ```bash
-# 1. Python virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 2. Python deps for downloading + converting
+# 1. Python deps for downloading + converting
 pip install -U huggingface_hub "numpy<2" sentencepiece safetensors torch
 
-# 3. Clone and build llama.cpp (CPU build)
+# 2. Clone and build llama.cpp (CPU build)
 git clone https://github.com/ggml-org/llama.cpp
 pip install -r llama.cpp/requirements.txt
 sudo apt install cmake
@@ -42,8 +86,8 @@ cmake -S llama.cpp -B llama.cpp/build -DCMAKE_BUILD_TYPE=Release
 
 # Build with LIMITED parallelism. Plain `-j` (no number) spawns one job per CPU
 # core, and each job uses ~1–2 GB RAM — that can exhaust memory and freeze the
-# machine. Cap it: use 2 jobs (safe), or `nproc/2`. Lower it further if it lags.
-cmake --build llama.cpp/build -j 2
+# machine. Cap it: use 1 jobs (safe), or `nproc/1`. Lower it further if it lags.
+cmake --build llama.cpp/build -j 1
 
 # 4. Verify the build
 ./llama.cpp/build/bin/llama-cli --version
@@ -363,7 +407,11 @@ they finish ~4× faster as the queue spreads across workers.
 - `Q4_K_M` is the safe default. GPTQ/AWQ shine on GPU; bitsandbytes is easiest in HF.
 
 **Next steps**
-- One-command GGUF: `ollama run tinyllama`
+- One-command GGUF:
+
+```bash
+ollama run tinyllama
+```
 - Homework: quantize a 3B model (Qwen2.5-3B or Phi-3).
 - Explore **imatrix** quantization for better low-bit quality.
 - Docs: https://github.com/ggml-org/llama.cpp

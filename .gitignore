@@ -1,4 +1,5 @@
 .venv
 llama.cpp
+models
 wikitext-2-raw
 wikitext-2-raw-v1.zip
