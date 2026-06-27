@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Scale Your LLM — Chat</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <style>
   :root {
     --bg: #1f1f1f;
@@ -78,6 +80,8 @@
   }
   button#send:disabled { opacity: 0.4; cursor: default; }
   .hint { max-width: 780px; margin: 8px auto 0; text-align: center; color: var(--muted); font-size: 11px; }
+  .bubble .katex-display { margin: 10px 0; overflow-x: auto; }
+  .bubble .katex { font-size: 1.05em; }
 </style>
 </head>
 <body>
@@ -130,7 +134,30 @@ function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function katexRender(src, displayMode) {
+  try {
+    return katex.renderToString(src, { displayMode, throwOnError: false, output: "html" });
+  } catch(e) {
+    return escapeHtml(src);
+  }
+}
+
 function render(text) {
+  // Step 0: Extract math blocks FIRST (before any escaping) to protect them
+  const mathBlocks = [];
+  function saveMath(src, displayMode) {
+    const idx = mathBlocks.length;
+    mathBlocks.push(katexRender(src, displayMode));
+    return `\x00MATH${idx}\x00`;
+  }
+
+  // Display math: $$...$$ and \[...\]
+  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => saveMath(m, true));
+  text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => saveMath(m, true));
+  // Inline math: \(...\) and $...$ (single dollar, not preceded/followed by another $)
+  text = text.replace(/\\\(([\s\S]+?)\\\)/g, (_, m) => saveMath(m, false));
+  text = text.replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)/g, (_, m) => saveMath(m, false));
+
   // Step 1: Extract fenced code blocks to protect them from further processing
   const codeBlocks = [];
   let html = text.replace(/```([\w]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
@@ -230,6 +257,7 @@ function render(text) {
   // Step 6: Restore placeholders
   html = html.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
   html = html.replace(/\x00INLINE(\d+)\x00/g, (_, i) => inlineCodes[+i]);
+  html = html.replace(/\x00MATH(\d+)\x00/g, (_, i) => mathBlocks[+i]);
 
   return html;
 }
