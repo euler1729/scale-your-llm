@@ -39,8 +39,17 @@
   }
   .msg.user .avatar { background: var(--user-bubble); }
   .msg.assistant .avatar { background: var(--accent); }
-  .bubble { padding-top: 4px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; flex: 1; }
+  .bubble { padding-top: 4px; line-height: 1.6; word-wrap: break-word; flex: 1; }
   .bubble p { margin: 0 0 10px; }
+  .bubble h1, .bubble h2, .bubble h3, .bubble h4, .bubble h5, .bubble h6 { margin: 14px 0 6px; line-height: 1.3; }
+  .bubble h1 { font-size: 1.4em; } .bubble h2 { font-size: 1.25em; } .bubble h3 { font-size: 1.1em; }
+  .bubble ul, .bubble ol { margin: 0 0 10px; padding-left: 1.6em; }
+  .bubble li { margin: 3px 0; }
+  .bubble blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 4px 12px; color: var(--muted); }
+  .bubble hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .bubble strong { font-weight: 700; }
+  .bubble em { font-style: italic; }
+  .bubble del { text-decoration: line-through; }
   .bubble pre {
     background: #141414; border: 1px solid var(--border); border-radius: 8px;
     padding: 12px; overflow-x: auto; font-size: 13px;
@@ -122,9 +131,106 @@ function escapeHtml(s) {
 }
 
 function render(text) {
-  let html = escapeHtml(text);
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code}</code></pre>`);
-  html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  // Step 1: Extract fenced code blocks to protect them from further processing
+  const codeBlocks = [];
+  let html = text.replace(/```([\w]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const escaped = escapeHtml(code.replace(/\n$/, ""));
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${escaped}</code></pre>`);
+    return `\x00CODE${idx}\x00`;
+  });
+
+  // Step 2: Extract inline code to protect it
+  const inlineCodes = [];
+  html = html.replace(/`([^`\n]+)`/g, (_, code) => {
+    const escaped = escapeHtml(code);
+    const idx = inlineCodes.length;
+    inlineCodes.push(`<code>${escaped}</code>`);
+    return `\x00INLINE${idx}\x00`;
+  });
+
+  // Step 3: Escape remaining HTML
+  html = escapeHtml(html);
+
+  // Step 4: Apply block-level markdown (process line by line)
+  const lines = html.split("\n");
+  const out = [];
+  let inUL = false, inOL = false;
+
+  function closeList() {
+    if (inUL) { out.push("</ul>"); inUL = false; }
+    if (inOL) { out.push("</ol>"); inOL = false; }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Headings
+    const hMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hMatch) {
+      closeList();
+      const lvl = hMatch[1].length;
+      out.push(`<h${lvl}>${hMatch[2]}</h${lvl}>`);
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^(---+|\*\*\*+|___+)$/.test(line.trim())) {
+      closeList();
+      out.push("<hr>");
+      continue;
+    }
+
+    // Blockquote
+    if (line.startsWith("&gt;")) {
+      closeList();
+      out.push(`<blockquote>${line.slice(4).trim()}</blockquote>`);
+      continue;
+    }
+
+    // Unordered list item
+    const ulMatch = line.match(/^(\*|-|\+)\s+(.+)$/);
+    if (ulMatch) {
+      if (!inUL) { closeList(); out.push("<ul>"); inUL = true; }
+      out.push(`<li>${ulMatch[2]}</li>`);
+      continue;
+    }
+
+    // Ordered list item
+    const olMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (!inOL) { closeList(); out.push("<ol>"); inOL = true; }
+      out.push(`<li>${olMatch[1]}</li>`);
+      continue;
+    }
+
+    // Blank line
+    if (line.trim() === "") {
+      closeList();
+      // Only add paragraph break if there's content above
+      if (out.length > 0 && out[out.length - 1] !== "</p>" && out[out.length - 1] !== "<br>") {
+        out.push("<br>");
+      }
+      continue;
+    }
+
+    closeList();
+    out.push(`<p>${line}</p>`);
+  }
+  closeList();
+
+  html = out.join("\n");
+
+  // Step 5: Inline markdown (bold+italic, bold, italic, strikethrough)
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
+
+  // Step 6: Restore placeholders
+  html = html.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
+  html = html.replace(/\x00INLINE(\d+)\x00/g, (_, i) => inlineCodes[+i]);
+
   return html;
 }
 
